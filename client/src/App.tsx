@@ -1,12 +1,23 @@
-import { useState } from "react";
+import "./App.css";
 
 function App() {
-  const [count, setCount] = useState(0);
+  const handleButtonWithChallenge = () => {
+    console.log("button with challenge clicked");
+  };
+
+  const handleButtonNoChallenge = () => {
+    console.log("button with challenge clicked");
+  };
 
   return (
-    <>
-      <div>Hello world</div>
-    </>
+    <div className="page">
+      <button type="button" onClick={handleButtonWithChallenge}>
+        I have challenge
+      </button>
+      <button type="button" onClick={handleButtonNoChallenge}>
+        I don't have challenge
+      </button>
+    </div>
   );
 }
 
