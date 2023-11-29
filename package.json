@@ -2,8 +2,11 @@
   "name": "waf-challenge",
   "type": "module",
   "workspaces": [
-    "./frontend"
+    "./client"
   ],
+  "scripts": {
+    "client": "cd client && bun run dev"
+  },
   "devDependencies": {
     "bun-types": "latest"
   },
