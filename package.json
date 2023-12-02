@@ -2,7 +2,8 @@
   "name": "waf-challenge",
   "type": "module",
   "workspaces": [
-    "./client"
+    "./client",
+    "./aws"
   ],
   "scripts": {
     "client": "cd client && bun run dev"
