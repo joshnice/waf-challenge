@@ -6,7 +6,8 @@
     "./aws"
   ],
   "scripts": {
-    "client": "cd client && bun run dev"
+    "client": "cd client && bun run dev",
+    "cdk": "cd aws && bun run cdk"
   },
   "devDependencies": {
     "bun-types": "latest"
