@@ -1,8 +1,14 @@
-import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
-import { Duration, aws_s3 as s3 } from "aws-cdk-lib";
-import { aws_lambda as lambda } from "aws-cdk-lib";
-import { aws_apigateway as apiGateway } from "aws-cdk-lib";
+import {
+  Duration,
+  aws_s3 as s3,
+  aws_lambda as lambda,
+  aws_apigateway as apiGateway,
+  Stack,
+  StackProps,
+  aws_wafv2 as WAF,
+  Fn,
+} from "aws-cdk-lib";
 import { BucketDeployment, Source } from "aws-cdk-lib/aws-s3-deployment";
 import * as path from "path";
 import { Distribution, OriginAccessIdentity } from "aws-cdk-lib/aws-cloudfront";
@@ -15,8 +21,8 @@ import { createName } from "./helpers";
  * Api with ApiGateway and Lambda
  * WAF protecting our API from frontend requests which are not challenged
  */
-export class WafChallenge extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+export class WafChallenge extends Stack {
+  constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
     /* FRONTEND */
@@ -43,12 +49,16 @@ export class WafChallenge extends cdk.Stack {
     bucket.grantRead(originAccessIdentity);
 
     // Create cloudfront distribution to deliver our frontend code to the user
-    new Distribution(this, createName("front-end-distribution"), {
-      defaultRootObject: "index.html",
-      defaultBehavior: {
-        origin: new S3Origin(bucket, { originAccessIdentity }),
-      },
-    });
+    const cloudFront = new Distribution(
+      this,
+      createName("front-end-distribution"),
+      {
+        defaultRootObject: "index.html",
+        defaultBehavior: {
+          origin: new S3Origin(bucket, { originAccessIdentity }),
+        },
+      }
+    );
 
     /* API */
 
@@ -77,5 +87,176 @@ export class WafChallenge extends cdk.Stack {
         stageName: "dev",
       },
     });
+
+    /* WAF */
+
+    // Waf rules
+    const wafRules: WAF.CfnWebACL.RuleProperty[] = [
+      {
+        name: "AWSManagedRulesBotControlRuleSet",
+        priority: 1,
+        overrideAction: { none: {} },
+        statement: {
+          managedRuleGroupStatement: {
+            vendorName: "AWS",
+            name: "AWSManagedRulesBotControlRuleSet",
+            scopeDownStatement: {
+              andStatement: {
+                statements: [
+                  {
+                    byteMatchStatement: {
+                      fieldToMatch: { uriPath: {} },
+                      positionalConstraint: "CONTAINS",
+                      searchString: "api",
+                      textTransformations: [
+                        {
+                          priority: 0,
+                          type: "LOWERCASE",
+                        },
+                      ],
+                    },
+                  },
+                  {
+                    notStatement: {
+                      statement: {
+                        byteMatchStatement: {
+                          fieldToMatch: {
+                            method: {},
+                          },
+                          positionalConstraint: "EXACTLY",
+                          searchString: "OPTIONS",
+                          textTransformations: [
+                            {
+                              type: "NONE",
+                              priority: 0,
+                            },
+                          ],
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+            managedRuleGroupConfigs: [
+              {
+                awsManagedRulesBotControlRuleSet: {
+                  inspectionLevel: "TARGETED",
+                },
+              },
+            ],
+            ruleActionOverrides: [
+              {
+                actionToUse: {
+                  captcha: {},
+                },
+                name: "TGT_VolumetricIpTokenAbsent",
+              },
+              {
+                actionToUse: {
+                  captcha: {},
+                },
+                name: "SignalNonBrowserUserAgent",
+              },
+              {
+                actionToUse: {
+                  captcha: {},
+                },
+                name: "CategoryHttpLibrary",
+              },
+            ],
+          },
+        },
+        visibilityConfig: {
+          sampledRequestsEnabled: true,
+          cloudWatchMetricsEnabled: true,
+          metricName: "AWSManagedRulesBotControlRuleSet",
+        },
+      },
+      {
+        name: "Block-Requests-With-Missing-Or-Rejected-Token-Label",
+        priority: 2,
+        action: { block: {} },
+        statement: {
+          andStatement: {
+            statements: [
+              {
+                orStatement: {
+                  statements: [
+                    {
+                      labelMatchStatement: {
+                        scope: "LABEL",
+                        key: "awswaf:managed:token:absent",
+                      },
+                    },
+                    {
+                      labelMatchStatement: {
+                        scope: "LABEL",
+                        key: "awswaf:managed:token:rejected",
+                      },
+                    },
+                  ],
+                },
+              },
+              {
+                notStatement: {
+                  statement: {
+                    byteMatchStatement: {
+                      fieldToMatch: {
+                        method: {},
+                      },
+                      positionalConstraint: "EXACTLY",
+                      searchString: "OPTIONS",
+                      textTransformations: [
+                        {
+                          type: "NONE",
+                          priority: 0,
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+        visibilityConfig: {
+          sampledRequestsEnabled: true,
+          cloudWatchMetricsEnabled: true,
+          metricName: "Block-Requests-With-Missing-Or-Rejected-Token-Label",
+        },
+      },
+    ];
+
+    const waf = new WAF.CfnWebACL(this, createName("waf"), {
+      defaultAction: { allow: {} },
+      scope: "REGIONAL",
+      name: createName("waf"),
+      rules: wafRules,
+      visibilityConfig: {
+        cloudWatchMetricsEnabled: true,
+        metricName: createName("waf-metrics"),
+        sampledRequestsEnabled: true,
+      },
+      tokenDomains: [cloudFront.domainName],
+    });
+
+    // new WAF.CfnWebACLAssociation(
+    //   this,
+    //   createName("waf-api-gateway-association"),
+    //   {
+    //     resourceArn: Fn.join("", [
+    //       "arn:aws:apigateway:",
+    //       Stack.of(this).region,
+    //       "::/restapis/",
+    //       api.restApiId,
+    //       "/stages/",
+    //       api.deploymentStage.stageName,
+    //     ]),
+    //     webAclArn: waf.attrArn,
+    //   }
+    // );
+
+    // waf.node.addDependency(api);
   }
 }
