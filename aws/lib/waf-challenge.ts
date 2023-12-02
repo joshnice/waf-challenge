@@ -1,7 +1,8 @@
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
-import { aws_s3 as s3 } from "aws-cdk-lib";
+import { Duration, aws_s3 as s3 } from "aws-cdk-lib";
 import { aws_lambda as lambda } from "aws-cdk-lib";
+import { aws_apigateway as apiGateway } from "aws-cdk-lib";
 import { BucketDeployment, Source } from "aws-cdk-lib/aws-s3-deployment";
 import * as path from "path";
 import { Distribution, OriginAccessIdentity } from "aws-cdk-lib/aws-cloudfront";
@@ -49,5 +50,32 @@ export class WafChallenge extends cdk.Stack {
       },
     });
 
+    /* API */
+
+    // Create a lambda function
+    // Acts as our API
+    const lambdaFunction = new lambda.Function(this, createName("lambda"), {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: "index.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../api")),
+      timeout: Duration.seconds(10),
+    });
+
+    // Crete api gateway
+    // Directs a request to our lambda function
+    const api = new apiGateway.LambdaRestApi(this, createName("api-gateway"), {
+      handler: lambdaFunction,
+      // Proxy makes sure all requests go to the same lambda function
+      proxy: true,
+      // Allows requests from different domains (otherwise we would get CORs errors)
+      defaultCorsPreflightOptions: {
+        allowOrigins: apiGateway.Cors.ALL_ORIGINS,
+      },
+      // Automatically deploy it
+      deploy: true,
+      deployOptions: {
+        stageName: "dev",
+      },
+    });
   }
 }

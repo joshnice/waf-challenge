@@ -7,7 +7,9 @@
   ],
   "scripts": {
     "client": "cd client && bun run dev",
-    "cdk": "cd aws && bun run cdk"
+    "client-build": "cd client && bun run build",
+    "synth": "cd aws && bun run synth",
+    "deploy": "cd aws && bun run deploy"
   },
   "devDependencies": {
     "bun-types": "latest"

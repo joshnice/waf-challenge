@@ -5,7 +5,8 @@
     "aws": "bin/aws.js"
   },
   "scripts": {
-    "cdk": "cdk"
+    "deploy": "cdk deploy",
+    "synth": "cdk synth"
   },
   "devDependencies": {
     "@types/node": "20.6.3",
