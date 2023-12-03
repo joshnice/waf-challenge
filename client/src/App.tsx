@@ -4,6 +4,10 @@ import "./App.css";
 // Replace this with your api gateway url
 const API = "https://w0r9aiva7f.execute-api.eu-west-2.amazonaws.com/dev";
 
+declare global {
+  const AwsWafIntegration: { fetch: (url: string) => Promise<any> };
+}
+
 function App() {
   const [results, setResult] = useState<
     {
@@ -14,25 +18,47 @@ function App() {
   >([]);
 
   const handleButtonWithChallenge = async () => {
-    handleRequest("Challenge");
+    try {
+      const response = await AwsWafIntegration.fetch(API);
+      const res = await response.json();
+      console.log("res", res);
+      setResult([
+        ...results,
+        {
+          message: JSON.stringify(res),
+          type: "Challenge",
+          code: response.status,
+        },
+      ]);
+    } catch (err) {
+      if (err instanceof Error) {
+        setResult([
+          ...results,
+          { message: err.message, type: "Challenge", code: 500 },
+        ]);
+      }
+    }
   };
 
   const handleButtonNoChallenge = async () => {
-    handleRequest("Non challenge");
-  };
-
-  const handleRequest = async (type: "Challenge" | "Non challenge") => {
     try {
       const response = await fetch(API, { method: "Get" });
       const res = await response.json();
       console.log("res", res);
       setResult([
         ...results,
-        { message: JSON.stringify(res), type, code: response.status },
+        {
+          message: JSON.stringify(res),
+          type: "Non challenge",
+          code: response.status,
+        },
       ]);
     } catch (err) {
       if (err instanceof Error) {
-        setResult([...results, { message: err.message, type, code: 500 }]);
+        setResult([
+          ...results,
+          { message: err.message, type: "Non challenge", code: 500 },
+        ]);
       }
     }
   };

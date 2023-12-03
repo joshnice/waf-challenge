@@ -80,6 +80,7 @@ export class WafChallenge extends Stack {
       // Allows requests from different domains (otherwise we would get CORs errors)
       defaultCorsPreflightOptions: {
         allowOrigins: apiGateway.Cors.ALL_ORIGINS,
+        allowHeaders: ["X-Aws-Waf-Token"],
       },
       // Automatically deploy it
       deploy: true,
@@ -107,7 +108,7 @@ export class WafChallenge extends Stack {
                     byteMatchStatement: {
                       fieldToMatch: { uriPath: {} },
                       positionalConstraint: "CONTAINS",
-                      searchString: "api",
+                      searchString: "dev",
                       textTransformations: [
                         {
                           priority: 0,
@@ -241,22 +242,22 @@ export class WafChallenge extends Stack {
       tokenDomains: [cloudFront.domainName],
     });
 
-    // new WAF.CfnWebACLAssociation(
-    //   this,
-    //   createName("waf-api-gateway-association"),
-    //   {
-    //     resourceArn: Fn.join("", [
-    //       "arn:aws:apigateway:",
-    //       Stack.of(this).region,
-    //       "::/restapis/",
-    //       api.restApiId,
-    //       "/stages/",
-    //       api.deploymentStage.stageName,
-    //     ]),
-    //     webAclArn: waf.attrArn,
-    //   }
-    // );
+    new WAF.CfnWebACLAssociation(
+      this,
+      createName("waf-api-gateway-association"),
+      {
+        resourceArn: Fn.join("", [
+          "arn:aws:apigateway:",
+          Stack.of(this).region,
+          "::/restapis/",
+          api.restApiId,
+          "/stages/",
+          api.deploymentStage.stageName,
+        ]),
+        webAclArn: waf.attrArn,
+      }
+    );
 
-    // waf.node.addDependency(api);
+    waf.node.addDependency(api);
   }
 }
