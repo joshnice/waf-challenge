@@ -6,7 +6,8 @@
   },
   "scripts": {
     "deploy": "cdk deploy",
-    "synth": "cdk synth"
+    "synth": "cdk synth",
+    "destroy": "cdk destroy"
   },
   "devDependencies": {
     "@types/node": "20.6.3",

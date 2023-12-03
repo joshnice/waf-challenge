@@ -9,7 +9,8 @@
     "client": "cd client && bun run dev",
     "client-build": "cd client && bun run build",
     "synth": "cd aws && bun run synth",
-    "deploy": "cd aws && bun run deploy"
+    "deploy": "cd aws && bun run deploy",
+    "destroy": "cd aws && bun run destroy"
   },
   "devDependencies": {
     "bun-types": "latest"
