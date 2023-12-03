@@ -2,7 +2,7 @@ import { useState } from "react";
 import "./App.css";
 
 // Replace this with your api gateway url
-const API = "https://w0r9aiva7f.execute-api.eu-west-2.amazonaws.com/dev/";
+const API = "https://w0r9aiva7f.execute-api.eu-west-2.amazonaws.com/dev";
 
 function App() {
   const [results, setResult] = useState<
@@ -14,29 +14,27 @@ function App() {
   >([]);
 
   const handleButtonWithChallenge = async () => {
-    const response = await fetch(API);
-    const res = await response.json();
-    setResult([
-      ...results,
-      {
-        type: "Challenge",
-        code: response.status,
-        message: JSON.stringify(res),
-      },
-    ]);
+    handleRequest("Challenge");
   };
 
   const handleButtonNoChallenge = async () => {
-    const response = await fetch(API);
-    const res = await response.json();
-    setResult([
-      ...results,
-      {
-        type: "Non challenge",
-        code: response.status,
-        message: JSON.stringify(res),
-      },
-    ]);
+    handleRequest("Non challenge");
+  };
+
+  const handleRequest = async (type: "Challenge" | "Non challenge") => {
+    try {
+      const response = await fetch(API, { method: "Get" });
+      const res = await response.json();
+      console.log("res", res);
+      setResult([
+        ...results,
+        { message: JSON.stringify(res), type, code: response.status },
+      ]);
+    } catch (err) {
+      if (err instanceof Error) {
+        setResult([...results, { message: err.message, type, code: 500 }]);
+      }
+    }
   };
 
   return (
