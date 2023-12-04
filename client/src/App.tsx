@@ -19,9 +19,9 @@ function App() {
 
   const handleButtonWithChallenge = async () => {
     try {
+      // Wrap our request in AwsWafIntegration.fetch which ensures it is accepted
       const response = await AwsWafIntegration.fetch(API);
       const res = await response.json();
-      console.log("res", res);
       setResult([
         ...results,
         {
@@ -42,9 +42,9 @@ function App() {
 
   const handleButtonNoChallenge = async () => {
     try {
+      // Request is not wrapped with AwsWafIntegration.fetch and therefore will fail
       const response = await fetch(API, { method: "Get" });
       const res = await response.json();
-      console.log("res", res);
       setResult([
         ...results,
         {

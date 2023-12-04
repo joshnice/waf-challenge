@@ -94,6 +94,8 @@ export class WafChallenge extends Stack {
     // Waf rules
     const wafRules: WAF.CfnWebACL.RuleProperty[] = [
       {
+        // Need the BotControlRuleSet for when wanting to use challenge
+        // https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-bot.html
         name: "AWSManagedRulesBotControlRuleSet",
         priority: 1,
         overrideAction: { none: {} },
@@ -101,11 +103,14 @@ export class WafChallenge extends Stack {
           managedRuleGroupStatement: {
             vendorName: "AWS",
             name: "AWSManagedRulesBotControlRuleSet",
+            // What requests we want to check
+            // With this setup we are checking every request
             scopeDownStatement: {
               andStatement: {
                 statements: [
                   {
                     byteMatchStatement: {
+                      // If the url path contains "dev"
                       fieldToMatch: { uriPath: {} },
                       positionalConstraint: "CONTAINS",
                       searchString: "dev",
@@ -118,6 +123,7 @@ export class WafChallenge extends Stack {
                     },
                   },
                   {
+                    // And is not an OPTIONS request
                     notStatement: {
                       statement: {
                         byteMatchStatement: {
@@ -142,26 +148,28 @@ export class WafChallenge extends Stack {
             managedRuleGroupConfigs: [
               {
                 awsManagedRulesBotControlRuleSet: {
+                  // Also need to set inspection level to "TARGETED" to use challenge
                   inspectionLevel: "TARGETED",
                 },
               },
             ],
+            // Recommended overrides, if these rules are met then challenge the request
             ruleActionOverrides: [
               {
                 actionToUse: {
-                  captcha: {},
+                  challenge: {},
                 },
                 name: "TGT_VolumetricIpTokenAbsent",
               },
               {
                 actionToUse: {
-                  captcha: {},
+                  challenge: {},
                 },
                 name: "SignalNonBrowserUserAgent",
               },
               {
                 actionToUse: {
-                  captcha: {},
+                  challenge: {},
                 },
                 name: "CategoryHttpLibrary",
               },
@@ -174,6 +182,7 @@ export class WafChallenge extends Stack {
           metricName: "AWSManagedRulesBotControlRuleSet",
         },
       },
+      // If the request has a missing or reject token after a challenge then we want to block it
       {
         name: "Block-Requests-With-Missing-Or-Rejected-Token-Label",
         priority: 2,
@@ -200,6 +209,7 @@ export class WafChallenge extends Stack {
                 },
               },
               {
+                // Don't challenge an OPTIONS request
                 notStatement: {
                   statement: {
                     byteMatchStatement: {
@@ -229,8 +239,10 @@ export class WafChallenge extends Stack {
       },
     ];
 
+    // Create WAF
     const waf = new WAF.CfnWebACL(this, createName("waf"), {
       defaultAction: { allow: {} },
+      // Regional as we are using WAF for API Gateway
       scope: "REGIONAL",
       name: createName("waf"),
       rules: wafRules,
@@ -239,13 +251,16 @@ export class WafChallenge extends Stack {
         metricName: createName("waf-metrics"),
         sampledRequestsEnabled: true,
       },
+      // Your front end domain, otherwise request will be reject even if the request passes the challenge
       tokenDomains: [cloudFront.domainName],
     });
 
+    // Links the WAF to the API gateway
     new WAF.CfnWebACLAssociation(
       this,
       createName("waf-api-gateway-association"),
       {
+        // API Gateway arn
         resourceArn: Fn.join("", [
           "arn:aws:apigateway:",
           Stack.of(this).region,
@@ -254,10 +269,12 @@ export class WafChallenge extends Stack {
           "/stages/",
           api.deploymentStage.stageName,
         ]),
+        // Waf arn
         webAclArn: waf.attrArn,
       }
     );
 
+    // Ensure api gateway is created first
     waf.node.addDependency(api);
   }
 }
